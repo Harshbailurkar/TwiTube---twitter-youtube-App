@@ -1,0 +1,94 @@
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+const userSchema = new mongoose.Schema(
+  {
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    fullName: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    avatar: {
+      type: String, //cloudinary image url
+      required: true,
+    },
+    coverImage: {
+      type: String, //cloudinary image url
+    },
+    watchHistory: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
+    password: {
+      type: String,
+      required: [true, "Please provide a password"],
+      trim: true,
+    },
+    refreshToken: {
+      type: String,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+// pre is a middleware function that runs before each save which is used to hash the password before saving the user model(inbuilt mongoose function)
+
+userSchema.pre("save", async function (next) {
+  // Hash the password before saving the user model
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, 8);
+  }
+  next();
+});
+//isPasswordCorrect is a method that checks if the password is correct or not
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password); //compare password with hashed password
+};
+userSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    {
+      id: this._id,
+      username: this.username,
+      email: this.email,
+      fullName: this.fullName,
+    },
+
+    process.env.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+    }
+  );
+};
+userSchema.method.generateRefreshToken = function () {
+  return jwt.sign(
+    {
+      id: this._id,
+    },
+
+    process.env.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+    }
+  );
+};
+//JWT is beared token
+export const User = mongoose.model("User", userSchema);
